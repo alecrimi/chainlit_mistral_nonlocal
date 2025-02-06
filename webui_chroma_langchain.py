@@ -2,7 +2,7 @@ import os
 import pdfplumber
 import requests
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Form
 from langchain.docstore.document import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.embeddings import SentenceTransformerEmbeddings
@@ -24,7 +24,6 @@ def query_mistral_model(prompt: str) -> str:
     response = requests.post(API_URL, headers=headers, json=payload)
     response.raise_for_status()
     result = response.json()
-    # Assumes the response JSON is a list with a dict containing 'generated_text'
     return result[0]['generated_text']
 
 # -----------------------------------------------------------------------------
@@ -70,22 +69,22 @@ def retrieve_documents(query: str, k: int = 3) -> str:
     return "\n\n".join([doc.page_content for doc in retrieved_docs])
 
 # -----------------------------------------------------------------------------
-# FastAPI endpoint: RAG query
+# FastAPI endpoint: RAG query using POST and a form field
 # -----------------------------------------------------------------------------
-@router.get("/rag")
-def rag_query(query: str):
+@router.post("/rag")
+def rag_query(query: str = Form(...)):
     try:
-        # Retrieve context from the vector store
+        # Retrieve context from the vector store.
         context = retrieve_documents(query)
-        # Build the prompt for Mistral. The prompt instructs the model to answer based only on the provided context.
+        # Build the prompt for Mistral. Instruct the model to answer based solely on the context.
         prompt = (
             "Use the following information to answer the question. "
             "Do not include the context or prompt text in your answer.\n\n"
             f"Context:\n{context}\n\nQuestion: {query}\nAnswer:"
         )
-        # Query the Mistral model
+        # Query the Mistral model.
         result = query_mistral_model(prompt)
-        # Optionally, extract only the answer portion if extra tokens are returned
+        # Optionally, extract only the answer portion.
         answer = result.split("Answer:")[-1].strip()
         return {"answer": answer}
     except Exception as e:
